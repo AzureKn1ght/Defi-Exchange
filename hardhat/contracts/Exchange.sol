@@ -98,7 +98,7 @@ contract Exchange is ERC20 {
         require(_amount > 0, "_amount should be greater than zero");
         uint ethReserve = address(this).balance;
         uint _totalSupply = totalSupply();
-        
+
         // The amount of Eth that would be sent back to the user is based
         // on a ratio
         // Ratio is -> (Eth sent back to the user) / (current Eth reserve)
@@ -106,6 +106,7 @@ contract Exchange is ERC20 {
         // Then by some maths -> (Eth sent back to the user)
         // = (current Eth reserve * amount of LP tokens that user wants to withdraw) / (total supply of LP tokens)
         uint ethAmount = (ethReserve * _amount) / _totalSupply;
+
         // The amount of Crypto Dev token that would be sent back to the user is based
         // on a ratio
         // Ratio is -> (Crypto Dev sent back to the user) / (current Crypto Dev token reserve)
@@ -113,13 +114,98 @@ contract Exchange is ERC20 {
         // Then by some maths -> (Crypto Dev sent back to the user)
         // = (current Crypto Dev token reserve * amount of LP tokens that user wants to withdraw) / (total supply of LP tokens)
         uint cryptoDevTokenAmount = (getReserve() * _amount) / _totalSupply;
+
         // Burn the sent LP tokens from the user's wallet because they are already sent to
         // remove liquidity
         _burn(msg.sender, _amount);
-        // Transfer `ethAmount` of Eth from user's wallet to the contract
+
+        // Transfer `ethAmount` of Eth from contract to the user's wallet
         payable(msg.sender).transfer(ethAmount);
-        // Transfer `cryptoDevTokenAmount` of Crypto Dev tokens from the user's wallet to the contract
+
+        // Transfer `cryptoDevTokenAmount` of Crypto Dev tokens from the contract to the user's wallet
         ERC20(cryptoDevTokenAddress).transfer(msg.sender, cryptoDevTokenAmount);
+
         return (ethAmount, cryptoDevTokenAmount);
+    }
+
+    /**
+     * @dev Returns the amount Eth/Crypto Dev tokens that would be returned to the user
+     * in the swap
+     */
+    function getAmountOfTokens(
+        uint256 inputAmount,
+        uint256 inputReserve,
+        uint256 outputReserve
+    ) public pure returns (uint256) {
+        require(inputReserve > 0 && outputReserve > 0, "invalid reserves");
+
+        // We are charging a fee of `1%`
+        // Input amount with fee = (input amount - (1*(input amount)/100)) = ((input amount)*99)/100
+        // We do not use the '/100' here to avoid floating point
+        uint256 inputAmountWithFee = inputAmount * 99;
+
+        // Because we need to follow the concept of `XY = K` curve
+        // We need to make sure (x + Δx) * (y - Δy) = x * y
+        // So the final formula is Δy = (y * Δx) / (x + Δx)
+        // Δy in our case is `tokens to be received`
+        // Δx = ((input amount)*99)/100, x = inputReserve, y = outputReserve
+        // So by putting the values in the formulae you can get the numerator and denominator
+        // We use '*100' in the denominator to match the '/100' omitted
+        uint256 numerator = inputAmountWithFee * outputReserve;
+        uint256 denominator = (inputReserve * 100) + inputAmountWithFee;
+        return numerator / denominator;
+    }
+
+    /**
+     * @dev Swaps Eth for CryptoDev Tokens
+     */
+    function ethToCryptoDevToken(uint _minTokens) public payable {
+        uint256 tokenReserve = getReserve();
+
+        // call the `getAmountOfTokens` to get the amount of Crypto Dev tokens
+        // that would be returned to the user after the swap
+        // Notice that the `inputReserve` we are sending is equal to
+        // `address(this).balance - msg.value` instead of just `address(this).balance`
+        // because `address(this).balance` already contains the `msg.value` user has sent in the given call
+        // so we need to subtract it to get the actual input reserve
+        uint256 tokensBought = getAmountOfTokens(
+            msg.value,
+            address(this).balance - msg.value,
+            tokenReserve
+        );
+
+        // Where _minTokens is the minimum expected output of tokens
+        require(tokensBought >= _minTokens, "insufficient output amount");
+
+        // Transfer the `Crypto Dev` tokens to the user
+        ERC20(cryptoDevTokenAddress).transfer(msg.sender, tokensBought);
+    }
+
+    /**
+     * @dev Swaps CryptoDev Tokens for Eth
+     */
+    function cryptoDevTokenToEth(uint _tokensSold, uint _minEth) public {
+        uint256 tokenReserve = getReserve();
+
+        // call the `getAmountOfTokens` to get the amount of Eth
+        // that would be returned to the user after the swap
+        uint256 ethBought = getAmountOfTokens(
+            _tokensSold,
+            tokenReserve,
+            address(this).balance
+        );
+
+        // Where _minEth is the minimum expected output of ETH
+        require(ethBought >= _minEth, "insufficient output amount");
+
+        // Transfer `Crypto Dev` tokens from the user's address to the contract
+        ERC20(cryptoDevTokenAddress).transferFrom(
+            msg.sender,
+            address(this),
+            _tokensSold
+        );
+        
+        // send the `ethBought` to the user from the contract
+        payable(msg.sender).transfer(ethBought);
     }
 }
