@@ -49,10 +49,10 @@ Hardhat is an Ethereum development environment and framework designed for full s
 
 ### Website
 
-- To develop the website we would be using [React](https://reactjs.org/) and [Next Js](https://nextjs.org/). 
+- To develop the website we would be using [React](https://reactjs.org/) and [Next.js](https://nextjs.org/). 
 
 - We will also use the [Web3Modal library](https://github.com/Web3Modal/web3modal). 
-Web3Modal is an easy-to-use library to help developers add support for multiple providers in their apps with a simple customizable configuration. By default Web3Modal Library supports injected providers like (Metamask, Dapper, Gnosis Safe, Frame, Web3 Browsers, etc), You can also easily configure the library to support Portis, Fortmatic, Squarelink, Torus, Authereum, D'CENT Wallet and Arkane.
+Web3Modal is an easy-to-use library to help developers add support for multiple providers in their apps with a simple customizable configuration. By default Web3Modal Library supports injected providers like (Metamask, Dapper, Gnosis Safe, Frame, Web3 Browsers, etc), You can also easily configure the library to support Portis, Fortmatic, Squarelink, Torus, Authereum, and Arkane.
 
 ### Technologies Used 
 - [Hardhat](https://hardhat.org/)
